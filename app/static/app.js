@@ -25,6 +25,13 @@ async function api(path, data) {
 function node(tag, text, cls) {
   const el = document.createElement(tag); if(text !== undefined) el.textContent = text; if(cls) el.className = cls; return el;
 }
+function operationProgress(anchorId, active, label='正在处理，请稍候…') {
+  const anchor=$(anchorId);if(!anchor)return;
+  const id=anchorId+'-progress';let box=$(id);
+  if(!active){if(box)box.remove();return;}
+  if(!box){box=node('div',undefined,'operation-progress');box.id=id;box.setAttribute('role','status');const text=node('span',label);const bar=document.createElement('progress');bar.setAttribute('aria-label','处理进行中');box.append(text,bar);anchor.before(box);}
+  else box.querySelector('span').textContent=label;
+}
 function renderMath(area) {
   if(typeof renderMathInElement==='function')renderMathInElement(area,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false},{left:'$',right:'$',display:false}],throwOnError:false,trust:false,strict:'ignore',maxExpand:1000,maxSize:20});
 }
@@ -38,7 +45,7 @@ function setMode() {
   verify.disabled=!verificationAvailable||draft||mode==='hint';if(verify.disabled)verify.checked=false;
   $('verify-option').hidden=draft;
 }
-let workFiles=[], workFileUrls=[];
+let workFiles=[], workFileUrls=[], imageRecognitionBusy=false;
 const ATTACHMENT_TYPES=new Set(['image/png','image/jpeg','image/webp','application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain','text/markdown']);
@@ -79,7 +86,7 @@ function renderWorkFiles(){
     info.append(node('small',formatSize(item.file.size)));
     row.append(info);
     if(isImageFile(item.file)){
-      const recognize=node('button','识别图片','text-button');recognize.type='button';
+      const recognize=node('button','识别图片','text-button');recognize.type='button';recognize.disabled=imageRecognitionBusy;
       recognize.onclick=()=>recognizeWorkImage(item.file);row.append(recognize);
     }else{
       const extract=node('button','提取文字','text-button');extract.type='button';
@@ -92,6 +99,10 @@ function renderWorkFiles(){
   }
 }
 async function recognizeWorkImage(file){
+  if(imageRecognitionBusy)return;
+  imageRecognitionBusy=true;
+  $('image-recognition-progress').hidden=false;
+  renderWorkFiles();
   try{
     $('form-status').textContent='正在将图片发送给当前模型识别…';
     const data=await api('/api/attachments/recognize',{name:file.name,base64:await fileToBase64(file)});
@@ -99,8 +110,10 @@ async function recognizeWorkImage(file){
     $('work-extract-panel').hidden=false;
     $('form-status').textContent=data.warning;
   }catch(error){$('form-status').textContent='识别失败：'+error.message;}
+  finally{imageRecognitionBusy=false;$('image-recognition-progress').hidden=true;renderWorkFiles();}
 }
 async function extractWorkFile(file){
+  operationProgress('form-status',true,'正在提取附件文字…');
   try{
     $('form-status').textContent='正在提取附件文字…';
     const data=await api('/api/attachments/extract',{name:file.name,base64:await fileToBase64(file)});
@@ -108,6 +121,7 @@ async function extractWorkFile(file){
     $('work-extract-panel').hidden=false;
     $('form-status').textContent=data.warning||'已提取文字；请核对后选择填入位置。';
   }catch(error){$('form-status').textContent=error.message;}
+  finally{operationProgress('form-status',false);}
 }
 $('extract-to-problem').onclick=()=>{const text=$('work-extract-text').value.trim();if(!text)return;$('problem').value=text;hideExtractPanel();$('problem').focus();};
 $('extract-to-solution').onclick=()=>{const text=$('work-extract-text').value.trim();if(!text)return;$('solution').value=text;hideExtractPanel();$('solution').focus();};
@@ -173,7 +187,7 @@ function populate(data) {
   $('verify-equation').checked=Boolean(data.verification_requested)&&!$('verify-equation').disabled;
 }
 async function loadSession(id) {
-  currentPoll++; sessionId=id; busy=false; refreshSubmitState();$('session-status').textContent='';
+  currentPoll++; sessionId=id; busy=false; operationProgress('form-status',false); refreshSubmitState();$('session-status').textContent='';
   history = await api('/api/sessions/'+id); await sessions(); renderHistory();
   if(history.length){populate(history.at(-1).data); renderResult(history.at(-1)); if(['queued','running'].includes(history.at(-1).state)) poll(history.at(-1).id);}
   else {populate({});$('result').replaceChildren(node('p','写下你的尝试，开始新的练习。','history-empty'));$('state-badge').textContent='等待提交';}
@@ -354,6 +368,7 @@ function mountExamExport(area,item){
       const run=node('button',report?'重新生成 PDF':'生成并导出 PDF');
       run.onclick=async()=>{
         run.disabled=true;run.textContent='正在排版并编译…';
+        const progress=document.createElement('progress');progress.setAttribute('aria-label','参考答案 PDF 正在生成');progress.className='export-progress';actions.append(progress);
         let failure='';
         try{
           let job=await api('/api/jobs',{kind:'exam-export',payload:{submission_id:item.id}});
@@ -372,18 +387,18 @@ function mountExamExport(area,item){
 }
 
 async function poll(id) {
-  const token=++currentPoll;busy=true;refreshSubmitState();
+  const token=++currentPoll;busy=true;operationProgress('form-status',true,'正在生成反馈，请稍候…');refreshSubmitState();
   while(token===currentPoll){
     try {const item=await api('/api/submissions/'+id);if(token!==currentPoll)return;renderResult(item);
-      if(!['queued','running'].includes(item.state)){history=await api('/api/sessions/'+sessionId);renderHistory();busy=false;refreshSubmitState();$('form-status').textContent='';if(window.matchMedia('(max-width:1080px)').matches)$('feedback-heading').scrollIntoView({behavior:'smooth',block:'start'});return;}
-    } catch(error){$('form-status').textContent=error.message;busy=false;refreshSubmitState();return;}
+      if(!['queued','running'].includes(item.state)){history=await api('/api/sessions/'+sessionId);renderHistory();busy=false;operationProgress('form-status',false);refreshSubmitState();$('form-status').textContent='';if(window.matchMedia('(max-width:1080px)').matches)$('feedback-heading').scrollIntoView({behavior:'smooth',block:'start'});return;}
+    } catch(error){$('form-status').textContent=error.message;busy=false;operationProgress('form-status',false);refreshSubmitState();return;}
     await new Promise(resolve=>setTimeout(resolve,1500));
   }
 }
 $('submission-form').onsubmit=async event=>{
   event.preventDefault();
   if(setupRequired){openSettings();settingsStatus('请先选择模型服务并保存，再开始检查。',true);return;}
-  if(busy)return;busy=true;$('form-status').textContent='正在提交…';refreshSubmitState();
+  if(busy)return;busy=true;operationProgress('form-status',true,'正在提交并准备处理…');$('form-status').textContent='正在提交…';refreshSubmitState();
   try{
     if(!sessionId)sessionId=(await api('/api/sessions',{})).id;
     const data=Object.fromEntries(['problem','solution','draft','request','mode'].map(k=>[k,$(k).value]));data.grade_level=$('grade').value;
@@ -395,7 +410,7 @@ $('submission-form').onsubmit=async event=>{
       data.attachments=await Promise.all(workFiles.map(async item=>({name:item.file.name,base64:await fileToBase64(item.file)})));
     }
     const {id}=await api('/api/sessions/'+sessionId+'/submissions',data);clearWorkFiles();await sessions();history=await api('/api/sessions/'+sessionId);renderHistory();poll(id);
-  }catch(error){$('form-status').textContent=error.message;busy=false;refreshSubmitState();}
+  }catch(error){$('form-status').textContent=error.message;busy=false;operationProgress('form-status',false);refreshSubmitState();}
 };
 $('new-session').onclick=async()=>{const exam=$('mode').value==='exam_answer';const {id}=await api('/api/sessions',{});await loadSession(id);if(exam){$('mode').value='exam_answer';setMode();}};
 $('toggle-archived').onclick=()=>{showArchived=!showArchived;sessions();};
@@ -527,7 +542,7 @@ async function saveSettings(event){
   finally{settingsBusy=false;}
 }
 async function testSettings({saveAfter=false}={}){
-  if(settingsBusy)return;settingsBusy=true;settingsStatus('正在测试连接…');
+  if(settingsBusy)return;settingsBusy=true;operationProgress('settings-status',true,'正在测试模型连接…');settingsStatus('正在测试连接…');
   try{
     const data=await api('/api/settings/test',settingsPayload());
     if(!data.ok){settingsStatus(data.message||'连接失败，请检查设置。',true);return;}
@@ -540,7 +555,7 @@ async function testSettings({saveAfter=false}={}){
       settingsStatus(data.message||'连接正常。');
     }
   }catch(error){settingsStatus(error.message,true);}
-  finally{settingsBusy=false;}
+  finally{settingsBusy=false;operationProgress('settings-status',false);}
 }
 async function openSettings(){
   const dialog=$('settings-dialog');
@@ -602,7 +617,7 @@ function showLesson(lesson){
   $('lesson-draft').value=lesson.data?.source_text||'';$('lesson-file').value='';
   const missing=$('lesson-missing');missing.replaceChildren();const required=[...(lesson.missing||[]),...(lesson.questions||[])];missing.hidden=!required.length;
   if(!missing.hidden){missing.append(node('strong','大纲中仍有待确认的信息'));const list=node('ul');for(const item of required)list.append(node('li',item));missing.append(list);}
-  $('lesson-clarifications').value=lesson.data?.clarifications||'';$('lesson-result').replaceChildren();
+  $('lesson-clarifications').value=lesson.data?.clarifications||'';$('lesson-clarifications-status').hidden=true;$('lesson-result').replaceChildren();
   if(lesson.result)renderLessonResult(lesson.result,lesson.id);
   lessonStep(lesson.slides_markdown?2:lesson.outline?1:0);
 }
@@ -627,11 +642,11 @@ function fileToBase64(file){
 }
 function lessonBusyState(message){
   lessonBusy=true;$('lesson-outline-button').disabled=true;$('lesson-source-button').disabled=true;$('lesson-render-button').disabled=true;
-  $('lesson-status').textContent=message;
+  $('lesson-status').textContent=message;operationProgress('lesson-status',true,message);
 }
 function lessonDone(message=''){
   lessonBusy=false;$('lesson-outline-button').disabled=false;$('lesson-source-button').disabled=false;$('lesson-render-button').disabled=false;
-  $('lesson-status').textContent=message;
+  $('lesson-status').textContent=message;operationProgress('lesson-status',false);
 }
 $('lesson-form').onsubmit=async event=>{
   event.preventDefault();if(lessonBusy)return;
@@ -642,11 +657,15 @@ $('lesson-form').onsubmit=async event=>{
     if(lessonTeachingSource)payload.teaching_source=lessonTeachingSource;
     if(file){payload.file_name=file.name;payload.file_base64=await fileToBase64(file);}
     lessonBusyState('正在依据课件 Skill 梳理教案并生成逐页大纲…');
-    currentLesson=await jobApi('/api/lessons/outline',payload);showLesson(currentLesson);lessonDone('请逐页核对大纲与待补充信息，再确认进入课件源码。');refreshLessonHistory();
+    currentLesson=await jobApi('/api/lessons/outline',payload);showLesson(currentLesson);lessonDone('请逐页核对大纲与待补充信息，再确认进入课件源码。');$('lesson-outline-stage').scrollIntoView({behavior:'smooth',block:'start'});refreshLessonHistory();
   }catch(error){lessonDone(error.message);}
 };
 $('lesson-source-button').onclick=async()=>{
   if(lessonBusy||!currentLesson)return;
+  if((currentLesson.missing_information||currentLesson.missing||[]).length&&!$('lesson-clarifications').value.trim()){
+    const status=$('lesson-clarifications-status');status.textContent='请先在这里补充上方列出的教学目标、范围等信息，或说明不适用的项目，再确认大纲。';status.hidden=false;$('lesson-clarifications').focus();status.scrollIntoView({behavior:'smooth',block:'nearest'});return;
+  }
+  $('lesson-clarifications-status').hidden=true;
   try{lessonBusyState('已提交大纲确认，正在生成可编辑课件源码…');
     currentLesson=await jobApi('/api/lessons/'+currentLesson.id+'/source',{outline:$('lesson-outline').value,clarifications:$('lesson-clarifications').value});
     showLesson(currentLesson);lessonDone('请检查页序、公式、例题和图示描述；确认后再渲染。');refreshLessonHistory();

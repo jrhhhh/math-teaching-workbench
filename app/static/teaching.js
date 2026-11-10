@@ -13,7 +13,7 @@ function addTaskItem(item={}){
 }
 function taskBusy(value,message=''){
   taskWorking=value;for(const id of ['task-design','task-publish','task-add-item','task-plan','task-refresh','task-select','task-to-lesson','task-followup','task-assessment','task-target'])$(id).disabled=value;
-  $('task-status').textContent=message;
+  $('task-status').textContent=message;operationProgress('task-status',value,message||'正在处理任务…');
   if(!value)$('task-plan').disabled=!activeEvidence||!activeEvidence.items.some(row=>['correct','incorrect','gap'].includes(row.state));
   if(!value&&activeTask?.plan?.stale){$('task-to-lesson').disabled=true;$('task-followup').disabled=true;}
 }

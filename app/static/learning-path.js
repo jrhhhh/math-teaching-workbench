@@ -3,7 +3,7 @@ function supportLabel(condition){return {no_recorded_support:'提交前未记录
 async function openLearningPath(taskId,itemId){
   const epoch=++pathEpoch;const opened=await api('/api/teaching/'+taskId+'/open/'+itemId,{});if(epoch!==pathEpoch)return;
   const path=await api('/api/teaching/'+taskId+'/path/'+itemId);if(epoch!==pathEpoch)return;
-  learningPath=path;learningPath.session_id=opened.session_id;pathBusy=false;
+  learningPath=path;learningPath.session_id=opened.session_id;pathBusy=false;operationProgress('path-status',false);
   const records=await api('/api/sessions/'+opened.session_id);if(epoch!==pathEpoch)return;
   $('path-solution').value=records.at(-1)?.data.solution||'';$('path-feedback').replaceChildren(node('p','先写出自己的尝试。'));
   $('path-guidance').hidden=true;$('path-widget').hidden=true;$('path-widget-note').textContent=path.item.interactive_template==='none'?'本题未设置数学操作活动，可以回到作答或请教师补充。':'活动可以帮助观察；打开后会记录为本题的一次帮助。';
@@ -26,7 +26,7 @@ function paintPath(path){
   showPathScene(pathScene);renderMath($('path-view'));
 }
 function showPathScene(id){pathScene=id;for(const [scene,element] of [['attempt','path-attempt-scene'],['explain','path-explain-scene'],['interactive','path-interactive-scene'],['independent_check','path-check-scene']])$(element).hidden=scene!==id;for(const tab of $('path-scene-tabs').children){tab.classList.toggle('active',tab.dataset.scene===id);tab.setAttribute('aria-pressed',String(tab.dataset.scene===id));}}
-function pathWorking(value,message=''){pathBusy=value;for(const id of ['path-submit','path-hint','path-answer','path-record-help'])$(id).disabled=value;$('path-status').textContent=message;}
+function pathWorking(value,message=''){pathBusy=value;for(const id of ['path-submit','path-hint','path-answer','path-record-help'])$(id).disabled=value;$('path-status').textContent=message;operationProgress('path-status',value,message||'正在处理，请稍候…');}
 async function refreshPath(){if(!learningPath)return;const epoch=pathEpoch;const value=await api('/api/teaching/'+learningPath.assignment_id+'/path/'+learningPath.item.id);if(epoch!==pathEpoch)return;learningPath={...value,session_id:learningPath.session_id};paintPath(learningPath);}
 function paintPathFeedback(item){const area=$('path-feedback');area.replaceChildren();area.append(node('p',labels[item.state]||item.state));if(item.result?.output?.reply)area.append(node('div',item.result.output.reply));else if(item.result?.error)area.append(node('p',item.result.error,'error-message'));if(item.support)area.append(node('p',supportLabel(item.support.condition),'result-meta'));renderMath(area);}
 async function pollPath(id,epoch){pathWorking(true,'正在检查本次尝试…');try{while(epoch===pathEpoch){const item=await api('/api/submissions/'+id);if(epoch!==pathEpoch)return;paintPathFeedback(item);if(!['queued','running'].includes(item.state)){await refreshPath();pathWorking(false,item.state==='error'||item.state==='interrupted'?'诊断未完成，请到任务中心继续。':'记录已更新；下一步可以修订或查看关联新题。');return;}await new Promise(resolve=>setTimeout(resolve,850));}}catch(error){if(epoch===pathEpoch)pathWorking(false,error.message);}}
