@@ -39,3 +39,40 @@
   drop.addEventListener('dragleave',()=>{if(--dragDepth<=0){dragDepth=0;drop.classList.remove('drag-over');}});
   drop.addEventListener('drop',event=>{event.preventDefault();dragDepth=0;drop.classList.remove('drag-over');if(!openedFromFile){addWorkFiles(event.dataTransfer.files);$('ui-announcement').textContent='附件已添加，请核对后提交。';}});
 })();
+
+/* Local role-oriented navigation; this is not an authentication boundary. */
+let workspaceRole='student';
+function applyWorkspaceRole(role){
+  workspaceRole=role;
+  $('show-answer').classList.remove('active');
+  $('show-answer').setAttribute('aria-pressed','false');
+  document.body.dataset.role=role;
+  for(const value of ['student','teacher']){
+    const button=$('role-'+value);
+    button.classList.toggle('active',value===role);
+    button.setAttribute('aria-pressed',String(value===role));
+  }
+  $('show-practice').hidden=role==='teacher';
+  $('show-teacher').hidden=role==='student';
+  $('task-create-panel').hidden=role==='student';
+  $('task-plan').hidden=role==='student';
+  $('task-plan-stage').hidden=role==='student'||!activeTask?.plan;
+  $('task-nav-label').textContent=role==='student'?'领取任务':'分发任务';
+  $('task-list-heading').textContent=role==='student'?'领取任务与提交作答':'学生作答与教师回看';
+  $('task-refresh').textContent=role==='student'?'刷新任务':'刷新当前证据';
+  switchWorkspace(role==='student'?'practice':'teacher');
+}
+$('role-student').onclick=()=>applyWorkspaceRole('student');
+$('role-teacher').onclick=()=>applyWorkspaceRole('teacher');
+$('show-answer').onclick=()=>{
+  openAnswerKey();
+  $('show-practice').classList.remove('active');
+  $('show-practice').setAttribute('aria-pressed','false');
+  $('show-answer').classList.add('active');
+  $('show-answer').setAttribute('aria-pressed','true');
+};
+for(const id of ['show-practice','show-teacher','show-teaching'])$(id).addEventListener('click',()=>{
+  $('show-answer').classList.remove('active');
+  $('show-answer').setAttribute('aria-pressed','false');
+});
+applyWorkspaceRole('student');

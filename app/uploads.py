@@ -1,11 +1,6 @@
-"""Local attachment storage and digital-text extraction.
+"""Local attachment storage and extraction of embedded document text.
 
-Attachments are files the student or teacher uploaded for their own reference.
-They are stored locally and never sent to the model. Digital documents (PDF,
-DOCX, TXT, MD) may expose their embedded text through an explicit "extract"
-action; the student reviews that text before putting it into a problem or
-solution field. Images are never transcribed: the project has no handwriting
-recognition layer.
+Image recognition is a separate, explicitly requested model operation.
 """
 import base64
 import binascii

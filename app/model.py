@@ -87,7 +87,7 @@ def probe(config):
     return {'ok': False, 'backend': 'codex-cli', 'message': 'Codex CLI 未登录或不可用。'}
 
 
-def _generate_codex(prompt, timeout, config):
+def _generate_codex(prompt, timeout, config, image_path=None):
     binary = shutil.which(config.get('codex_bin') or 'codex')
     if not binary:
         raise ModelError('未找到 Codex CLI，请安装并登录，或在设置中改用 HTTP 后端。')
@@ -98,6 +98,8 @@ def _generate_codex(prompt, timeout, config):
                    '--sandbox', 'read-only', '--json', '--color', 'never',
                    '-c', 'features.shell_tool=false', '-c', 'features.multi_agent=false',
                    '-C', folder, '-o', str(output), '-']
+        if image_path:
+            command[2:2] = ['--image', str(image_path)]
         model_name = config.get('model') or ''
         if model_name:
             command[2:2] = ['--model', model_name]
@@ -290,7 +292,7 @@ def _http_message(category, status=None):
     }.get(category, '模型调用失败，请检查接口地址、模型名和网络。')
 
 
-def _generate_http(prompt, timeout, config):
+def _generate_http(prompt, timeout, config, image_data_url=None):
     base = (config.get('base_url') or '').strip()
     if not base:
         raise ModelError('HTTP 后端尚未填写接口地址。',
@@ -298,7 +300,13 @@ def _generate_http(prompt, timeout, config):
     style = _http_style(config)
     model_name = _http_model(config)
     url = _http_endpoint(base, style)
-    body = json.dumps(_http_payload(prompt, style, model_name), ensure_ascii=False).encode('utf-8')
+    payload = _http_payload(prompt, style, model_name)
+    if image_data_url:
+        if style == 'responses':
+            payload['input'] = [{'role':'user', 'content':[{'type':'input_text','text':prompt}, {'type':'input_image','image_url':image_data_url}]}]
+        else:
+            payload['messages'][0]['content'] = [{'type':'text','text':prompt}, {'type':'image_url','image_url':{'url':image_data_url}}]
+    body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
     headers = {'Content-Type': 'application/json', 'Accept': 'application/json'}
     key = (config.get('api_key') or '').strip()
     if key:

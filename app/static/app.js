@@ -78,7 +78,10 @@ function renderWorkFiles(){
     info.append(node('strong',item.file.name));
     info.append(node('small',formatSize(item.file.size)));
     row.append(info);
-    if(!isImageFile(item.file)){
+    if(isImageFile(item.file)){
+      const recognize=node('button','识别图片','text-button');recognize.type='button';
+      recognize.onclick=()=>recognizeWorkImage(item.file);row.append(recognize);
+    }else{
       const extract=node('button','提取文字','text-button');extract.type='button';
       extract.onclick=()=>extractWorkFile(item.file);row.append(extract);
     }
@@ -87,6 +90,15 @@ function renderWorkFiles(){
     row.append(remove);
     list.append(row);
   }
+}
+async function recognizeWorkImage(file){
+  try{
+    $('form-status').textContent='正在将图片发送给当前模型识别…';
+    const data=await api('/api/attachments/recognize',{name:file.name,base64:await fileToBase64(file)});
+    $('work-extract-text').value=data.text||'';
+    $('work-extract-panel').hidden=false;
+    $('form-status').textContent=data.warning;
+  }catch(error){$('form-status').textContent='识别失败：'+error.message;}
 }
 async function extractWorkFile(file){
   try{
@@ -191,7 +203,7 @@ function renderResult(item) {
       const image=document.createElement('img');
       image.src=url;image.alt='第 '+item.revision+' 次提交的附件';image.loading='lazy';
       figure.append(image);
-      figure.append(node('figcaption','第 '+item.revision+' 次提交的图片 · 仅本地查看，系统未识别其中文字'));
+      figure.append(node('figcaption','第 '+item.revision+' 次提交的图片 · 本地保存的原图；识别结果请以用户核对后的文字为准'));
       area.append(figure);
     }else{
       const link=node('a',(attachment.ext==='.pdf'?'查看 PDF 附件':'查看附件')+' ↗','attachment-link');
@@ -388,6 +400,7 @@ $('submission-form').onsubmit=async event=>{
 $('new-session').onclick=async()=>{const exam=$('mode').value==='exam_answer';const {id}=await api('/api/sessions',{});await loadSession(id);if(exam){$('mode').value='exam_answer';setMode();}};
 $('toggle-archived').onclick=()=>{showArchived=!showArchived;sessions();};
 $('mode').onchange=setMode;
+$('work-camera').onchange=()=>{addWorkFiles([...$('work-camera').files]);$('work-camera').value='';};
 $('work-files').onchange=()=>{
   addWorkFiles([...$('work-files').files]);
   $('work-files').value='';

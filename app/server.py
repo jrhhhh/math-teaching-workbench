@@ -489,7 +489,7 @@ def handler_for(app):
                     max_size = 8 * 1024 * 1024
                 elif self.path.startswith('/api/sessions/') and self.path.endswith('/submissions'):
                     max_size = 25 * 1024 * 1024
-                elif self.path == '/api/attachments/extract':
+                elif self.path in ('/api/attachments/extract', '/api/attachments/recognize'):
                     max_size = 8 * 1024 * 1024
                 else:
                     max_size = 150000
@@ -506,6 +506,9 @@ def handler_for(app):
                     if len(parts)==5 and parts[4]=='cancel':return self.send(app.cancel_job(parts[3]))
                 if self.path == '/api/settings':
                     return self.send(settings.save(data))
+                if self.path == '/api/attachments/recognize':
+                    from .image_recognition import recognize
+                    return self.send(recognize(data.get('name'), data.get('base64')))
                 if self.path == '/api/attachments/extract':
                     name = data.get('name')
                     encoded = data.get('base64')

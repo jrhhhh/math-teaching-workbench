@@ -1535,3 +1535,11 @@ input::file-selector-button {
 #settings-status:empty{display:none}
 @media(max-width:620px){.dimension-head{flex-wrap:wrap;gap:4px}.result-judgment{display:block}}
 .mode-mismatch{margin:0 0 14px;padding:9px 12px;border-radius:10px;background:#fff8e8;border:1px solid #e3c56b;color:#6b5317;font-size:11px;line-height:1.7}
+
+/* Role navigation follows the existing study-workbench visual language. */
+.role-switcher{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.45)}
+.role-switcher button{min-width:0;margin:0;padding:9px 4px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-weight:600}
+.role-switcher button.active{background:#fff;color:var(--red);box-shadow:0 3px 12px rgba(56,32,42,.08)}
+.role-note{margin:8px 4px 16px;color:var(--muted);font-size:10px;line-height:1.5}
+.workspace-switcher button[hidden],#task-create-panel[hidden],#task-plan[hidden],#task-plan-stage[hidden]{display:none!important}
+body[data-role="student"] #teaching-view .teacher-layout{grid-template-columns:minmax(0,1fr)}

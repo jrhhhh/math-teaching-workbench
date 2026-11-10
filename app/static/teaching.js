@@ -32,7 +32,7 @@ async function loadTask(id){
     if(row.first_error){card.append(node('blockquote',row.first_error.quote||''));card.append(node('p',row.first_error.reason||''));}
     const begin=node('button',row.submission_id?'学生 · 继续修订 →':'学生 · 领取并作答 →','text-button');begin.onclick=async()=>{if(taskWorking)return;try{taskBusy(true,'正在打开任务对应的练习…');const opened=await api('/api/teaching/'+id+'/open/'+row.id,{});await loadSession(opened.session_id);if(!history.length)populate({problem:opened.problem,mode:'check',grade_level:'高中',request:'本题目标：'+opened.objective});switchWorkspace('practice');taskBusy(false);$('form-status').textContent='来自教学任务：'+activeTask.title+'。完成诊断后，在“师生任务”刷新查看。';$('problem').focus();}catch(error){taskBusy(false,error.message);}};card.append(begin);const pathButton=node('button','按学习路径学习 →','text-button');pathButton.onclick=()=>openLearningPath(id,row.id).catch(error=>taskBusy(false,error.message));card.append(pathButton);area.append(card);
   }
-  $('task-plan-stage').hidden=!activeTask.plan;
+  $('task-plan-stage').hidden=!activeTask.plan||document.body.dataset.role==='student';
   if(activeTask.plan){$('task-plan-draft').value=activeTask.plan.draft_markdown;$('task-plan-note').textContent=activeTask.plan.stale?'学生提交或诊断已经变化，这份教案依据已过期；请重新规划。':'依据绑定当前提交。请检查数学内容和引文后再用于课堂。';}
   renderMath($('task-evidence'));
   taskBusy(false);

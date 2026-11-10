@@ -12,7 +12,7 @@
 
 项目级调度顺序：教案/备课课件 → Lesson Materials Builder；只有题目且要求求解 → Answer Key Builder；包含学生正式解答 → Math Error Diagnosis；明确优化且完整诊断通过 → Solution Refiner；仅分析草稿版面 → Draft Coach。课后补救课先从诊断中提炼匿名化教学目标，再由教师提供教案草稿交给 Lesson Materials Builder。跨技能工作流、输入和验证边界见 [教师 Agent Skill](high-school-math-teacher-agent/SKILL.md)。
 
-未包含 presolve-starter；不会开始时可给起步帮助，但不要声称调用未安装技能。本项目**不内置任何手写转写（OCR）技能**：把草稿照片变成文字不归这套技能管，也不许由助手自己看图代劳——原因见 [draft-coach/references/image-intake.md](draft-coach/references/image-intake.md) 第一条。外部 OCR 若由宿主提供，只能当版面/内容的线索，**不作证据**；学生确认之前，它不进入任何结论。
+未包含 presolve-starter；不会开始时可给起步帮助，但不要声称调用未安装技能。工作台可在用户主动操作时将图片发送给当前支持视觉输入的模型做转写。识别文字必须由用户核对确认后才进入题目或解答字段；不能把未确认的识别当作学生原文。草稿版面仍以学生确认的描述为依据，不从 OCR 文字推断图像布局。
 
 ## 调度
 
